@@ -1,0 +1,402 @@
+-- =====================================================================
+-- Base.sql  |  Base de datos: rampify
+-- Script unificado (estructura + datos) generado a partir de los dumps
+-- MySQL 8.0+ (probado con la estructura de MySQL 9.7.0)
+-- NOTA: elimina y vuelve a crear la base de datos "rampify".
+-- =====================================================================
+
+DROP DATABASE IF EXISTS rampify;
+CREATE DATABASE rampify CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+USE rampify;
+
+SET NAMES utf8mb4;
+SET TIME_ZONE = '+00:00';
+SET FOREIGN_KEY_CHECKS = 0;
+SET UNIQUE_CHECKS = 0;
+SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';
+
+-- =====================================================================
+-- 1. TABLAS CATÁLOGO
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- rol
+-- ---------------------------------------------------------------------
+CREATE TABLE `rol` (
+  `id_rol` tinyint unsigned NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(30) NOT NULL,
+  PRIMARY KEY (`id_rol`),
+  UNIQUE KEY `uq_rol_nombre` (`nombre`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `rol` VALUES (3,'Administrador del sistema'),(2,'Empleado de la asociación'),(1,'Usuario de la app');
+
+-- ---------------------------------------------------------------------
+-- estado_cuenta
+-- ---------------------------------------------------------------------
+CREATE TABLE `estado_cuenta` (
+  `id_estado_cuenta` tinyint unsigned NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(30) NOT NULL,
+  PRIMARY KEY (`id_estado_cuenta`),
+  UNIQUE KEY `uq_estado_cuenta_nombre` (`nombre`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `estado_cuenta` VALUES (1,'Activa'),(4,'Baneada'),(5,'Eliminada'),(2,'Pendiente de autorización'),(3,'Suspendida');
+
+-- ---------------------------------------------------------------------
+-- estado_reporte
+-- ---------------------------------------------------------------------
+CREATE TABLE `estado_reporte` (
+  `id_estado_reporte` tinyint unsigned NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(20) NOT NULL,
+  PRIMARY KEY (`id_estado_reporte`),
+  UNIQUE KEY `uq_estado_reporte_nombre` (`nombre`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `estado_reporte` VALUES (2,'En proceso'),(1,'Pendiente'),(4,'Rechazado'),(3,'Solucionado');
+
+-- ---------------------------------------------------------------------
+-- criterio_invalido
+-- ---------------------------------------------------------------------
+CREATE TABLE `criterio_invalido` (
+  `id_criterio` tinyint unsigned NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(60) NOT NULL,
+  PRIMARY KEY (`id_criterio`),
+  UNIQUE KEY `uq_criterio_nombre` (`nombre`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `criterio_invalido` VALUES (3,'Descripción ilegible'),(1,'Incumple Términos y Condiciones'),(2,'Sin barrera de accesibilidad en la imagen'),(4,'Solicitud del autor');
+
+-- ---------------------------------------------------------------------
+-- tipo_problema
+-- ---------------------------------------------------------------------
+CREATE TABLE `tipo_problema` (
+  `id_tipo_problema` int NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(60) NOT NULL,
+  `activo` tinyint(1) NOT NULL DEFAULT '1',
+  `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_tipo_problema`),
+  UNIQUE KEY `uq_tipo_problema_nombre` (`nombre`),
+  CONSTRAINT `ck_tipo_problema_nombre` CHECK ((char_length(`nombre`) between 2 and 60))
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `tipo_problema` VALUES (1,'Rampa dañada o inexistente',1,'2026-11-09 23:39:34'),(2,'Banqueta en mal estado',1,'2026-11-09 23:39:34'),(3,'Falta de cruce peatonal accesible',1,'2026-11-09 23:39:34'),(4,'Obstáculo en la vía',1,'2026-11-09 23:39:34'),(5,'Sin guía táctil',0,'2026-11-09 23:39:34'),(11,'Lugar inadecuado',1,'2026-11-10 10:18:44');
+
+-- =====================================================================
+-- 2. USUARIOS
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- usuario
+-- ---------------------------------------------------------------------
+CREATE TABLE `usuario` (
+  `id_usuario` int NOT NULL AUTO_INCREMENT,
+  `id_rol` tinyint unsigned NOT NULL,
+  `id_estado_cuenta` tinyint unsigned NOT NULL,
+  `nombre` varchar(100) DEFAULT NULL,
+  `correo` varchar(254) DEFAULT NULL,
+  `contrasena_hash` varchar(255) DEFAULT NULL,
+  `intentos_fallidos` tinyint unsigned NOT NULL DEFAULT '0',
+  `bloqueo_hasta` datetime DEFAULT NULL,
+  `ultimo_acceso` datetime DEFAULT NULL,
+  `fecha_registro` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `fecha_aceptacion_aviso` datetime DEFAULT NULL,
+  `fecha_eliminacion_programada` datetime DEFAULT NULL,
+  PRIMARY KEY (`id_usuario`),
+  UNIQUE KEY `uq_usuario_correo` (`correo`),
+  KEY `ix_usuario_rol` (`id_rol`),
+  KEY `ix_usuario_estado` (`id_estado_cuenta`),
+  CONSTRAINT `fk_usuario_estado_cuenta` FOREIGN KEY (`id_estado_cuenta`) REFERENCES `estado_cuenta` (`id_estado_cuenta`),
+  CONSTRAINT `fk_usuario_rol` FOREIGN KEY (`id_rol`) REFERENCES `rol` (`id_rol`),
+  CONSTRAINT `ck_usuario_intentos` CHECK ((`intentos_fallidos` <= 5)),
+  CONSTRAINT `ck_usuario_nombre` CHECK (((`nombre` is null) or (char_length(`nombre`) between 2 and 100)))
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `usuario` VALUES (2,3,1,'Administrador inicial','rampifycontacto@gmail.com','$2a$10$9ILjF0QSN0HS1m8I.jH5IejqdHK/4/E5M/utDO5sm.hdW5bwdW6n2',0,NULL,'2026-11-11 01:00:41','2026-11-08 16:11:35',NULL,NULL),(3,1,1,'Ana Ciudadana','ana.usuario@rampify.test','$2b$10$0v2iSOF2xU.L4w3awlLAlO7YDRhnfIQ8Do/MnZvMvunU8J6sIfs.y',0,NULL,NULL,'2026-11-09 23:39:45','2026-11-09 23:39:45',NULL),(4,2,1,'Luis Empleado','luis.empleado@rampify.test','$2b$10$0v2iSOF2xU.L4w3awlLAlO7YDRhnfIQ8Do/MnZvMvunU8J6sIfs.y',0,NULL,'2026-11-10 23:04:08','2026-11-09 23:39:45','2026-11-09 23:39:45',NULL),(7,2,2,'Marta Pendiente','marta.pendiente@rampify.test','$2b$10$0v2iSOF2xU.L4w3awlLAlO7YDRhnfIQ8Do/MnZvMvunU8J6sIfs.y',0,NULL,NULL,'2026-11-10 00:31:56','2026-11-10 00:31:56',NULL),(8,3,1,'Rampify Pruebas','rampifypruebas@gmail.com','$2a$10$C41p603g0fBsiTQgYF/PhunYVnsjGlJvXUfgdJOZJGzVLijzAK1.6',0,NULL,'2026-11-11 00:22:56','2026-11-11 00:22:50','2026-11-11 00:22:50',NULL);
+
+-- ---------------------------------------------------------------------
+-- preferencia_notificacion
+-- ---------------------------------------------------------------------
+CREATE TABLE `preferencia_notificacion` (
+  `id_usuario` int NOT NULL,
+  `notif_estado_reporte` tinyint(1) NOT NULL DEFAULT '1',
+  `notif_eliminacion_reporte` tinyint(1) NOT NULL DEFAULT '1',
+  PRIMARY KEY (`id_usuario`),
+  CONSTRAINT `fk_preferencia_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuario` (`id_usuario`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- ---------------------------------------------------------------------
+-- codigo_verificacion
+-- ---------------------------------------------------------------------
+CREATE TABLE `codigo_verificacion` (
+  `id_codigo` int NOT NULL AUTO_INCREMENT,
+  `id_usuario` int NOT NULL,
+  `tipo` enum('Recuperación','Cambio de correo') NOT NULL,
+  `correo_destino` varchar(254) NOT NULL,
+  `codigo_hash` varchar(255) NOT NULL,
+  `intentos_incorrectos` tinyint unsigned NOT NULL DEFAULT '0',
+  `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `fecha_expiracion` datetime NOT NULL,
+  `usado` tinyint(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id_codigo`),
+  KEY `ix_codigo_usuario_tipo_fecha` (`id_usuario`,`tipo`,`fecha_creacion`),
+  CONSTRAINT `fk_codigo_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `ck_codigo_intentos` CHECK ((`intentos_incorrectos` <= 5)),
+  CONSTRAINT `ck_codigo_vigencia` CHECK ((`fecha_expiracion` > `fecha_creacion`))
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `codigo_verificacion` VALUES (1,2,'Recuperación','rampifycontacto@gmail.com','$2a$10$isxPuJbD9cq4jOabvyDYK.b5ylH4eeu4jnNy767tag0IAlFQ.6Z5G',0,'2026-11-08 16:32:36','2026-11-08 16:42:36',1),(2,2,'Recuperación','rampifycontacto@gmail.com','$2a$10$qBdHzBiSpkfSj82Z2j1mNeKmD7gvl6DZelEMMBC.HU5nBQ.KvyIPO',0,'2026-11-08 16:33:30','2026-11-08 16:43:30',1),(3,2,'Recuperación','rampifycontacto@gmail.com','$2a$10$.LxQl8DiMtqqoT5cQekEdujhsc9kR/c0klqlYx.1jGmeue8ZpphsW',0,'2026-11-08 16:38:35','2026-11-08 16:48:35',1),(4,2,'Recuperación','rampifycontacto@gmail.com','$2a$10$RVf5qLesdYuMbCWwU.M.8OkhkmgHjfKBET55ULxsTRQ4szGyEOT1S',1,'2026-11-08 16:43:09','2026-11-08 16:53:09',1),(5,2,'Recuperación','rampifycontacto@gmail.com','$2a$10$TriYfyw4zGtpiJ/PzBByDe2Mh.iABwTh4.dIMcvdxPxdDl3vS5RTS',0,'2026-11-09 10:04:26','2026-11-09 10:14:26',1);
+
+-- ---------------------------------------------------------------------
+-- invitacion_admin
+-- ---------------------------------------------------------------------
+CREATE TABLE `invitacion_admin` (
+  `id_invitacion` int NOT NULL AUTO_INCREMENT,
+  `id_admin` int NOT NULL,
+  `correo` varchar(254) NOT NULL,
+  `token_hash` varchar(255) NOT NULL,
+  `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `fecha_expiracion` datetime NOT NULL,
+  `usada` tinyint(1) NOT NULL DEFAULT '0',
+  `id_usuario_creado` int DEFAULT NULL,
+  PRIMARY KEY (`id_invitacion`),
+  UNIQUE KEY `uq_invitacion_token` (`token_hash`),
+  KEY `ix_invitacion_admin` (`id_admin`),
+  KEY `ix_invitacion_correo` (`correo`),
+  KEY `ix_invitacion_usuario_creado` (`id_usuario_creado`),
+  CONSTRAINT `fk_invitacion_admin` FOREIGN KEY (`id_admin`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `fk_invitacion_usuario_creado` FOREIGN KEY (`id_usuario_creado`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `ck_invitacion_vigencia` CHECK ((`fecha_expiracion` > `fecha_creacion`))
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `invitacion_admin` VALUES (1,2,'carlosskqglz@gmail.com','217c8af882e1b8f430bc430b836a379313ebdd63b17b8a8a1ab3b1e134d0c87b','2026-11-10 10:08:36','2026-11-11 10:08:36',0,NULL),(2,2,'rampifypruebas@gmail.com','7d732ce663ee2045236c5021af1922cc677a65a139e48664d1eed97d2fd50bbf','2026-11-11 00:22:12','2026-11-12 00:22:12',1,8);
+
+-- =====================================================================
+-- 3. REPORTES
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- reporte
+-- ---------------------------------------------------------------------
+CREATE TABLE `reporte` (
+  `id_reporte` int NOT NULL AUTO_INCREMENT,
+  `folio` char(12) NOT NULL,
+  `id_usuario` int NOT NULL,
+  `id_tipo_problema` int NOT NULL,
+  `id_estado_reporte` tinyint unsigned NOT NULL DEFAULT '1',
+  `descripcion` varchar(500) NOT NULL,
+  `latitud` decimal(9,6) NOT NULL,
+  `longitud` decimal(9,6) NOT NULL,
+  `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `eliminado` tinyint(1) NOT NULL DEFAULT '0',
+  `fecha_eliminacion` datetime DEFAULT NULL,
+  `id_criterio_eliminacion` tinyint unsigned DEFAULT NULL,
+  PRIMARY KEY (`id_reporte`),
+  UNIQUE KEY `uq_reporte_folio` (`folio`),
+  KEY `ix_reporte_usuario` (`id_usuario`),
+  KEY `ix_reporte_tipo` (`id_tipo_problema`),
+  KEY `ix_reporte_estado` (`id_estado_reporte`),
+  KEY `ix_reporte_criterio` (`id_criterio_eliminacion`),
+  KEY `ix_reporte_fecha` (`fecha_creacion`),
+  KEY `ix_reporte_ubicacion` (`latitud`,`longitud`),
+  CONSTRAINT `fk_reporte_criterio` FOREIGN KEY (`id_criterio_eliminacion`) REFERENCES `criterio_invalido` (`id_criterio`),
+  CONSTRAINT `fk_reporte_estado` FOREIGN KEY (`id_estado_reporte`) REFERENCES `estado_reporte` (`id_estado_reporte`),
+  CONSTRAINT `fk_reporte_tipo_problema` FOREIGN KEY (`id_tipo_problema`) REFERENCES `tipo_problema` (`id_tipo_problema`),
+  CONSTRAINT `fk_reporte_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `ck_reporte_descripcion` CHECK ((char_length(`descripcion`) between 10 and 500)),
+  CONSTRAINT `ck_reporte_eliminacion` CHECK ((((`eliminado` = 0) and (`fecha_eliminacion` is null) and (`id_criterio_eliminacion` is null)) or ((`eliminado` = 1) and (`fecha_eliminacion` is not null) and (`id_criterio_eliminacion` is not null)))),
+  CONSTRAINT `ck_reporte_folio` CHECK (((char_length(`folio`) = 12) and (`folio` like _utf8mb4'RMP-%'))),
+  CONSTRAINT `ck_reporte_latitud` CHECK ((`latitud` between -(90) and 90)),
+  CONSTRAINT `ck_reporte_longitud` CHECK ((`longitud` between -(180) and 180))
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `reporte` VALUES (1,'RMP-90000001',3,1,1,'La rampa de la esquina está rota y una silla de ruedas no puede subir.',19.432600,-99.133200,'2026-11-08 23:39:56',0,NULL,NULL),(2,'RMP-90000002',3,1,2,'Rampa con un hueco grande en el centro, peligrosa para sillas de ruedas.',19.433100,-99.134000,'2026-11-06 23:39:56',0,NULL,NULL),(3,'RMP-90000003',3,2,3,'Banqueta con losas levantadas que dificultan el paso de bastones y sillas.',19.427000,-99.167700,'2026-11-03 23:39:56',0,NULL,NULL),(4,'RMP-90000004',3,3,1,'El cruce no tiene rampas en ninguno de los dos lados de la avenida.',19.436900,-99.072000,'2026-11-07 23:39:56',0,NULL,NULL),(5,'RMP-90000005',3,4,4,'Foto de un árbol, no se observa ninguna barrera de accesibilidad.',19.419500,-99.145000,'2026-11-01 23:39:56',0,NULL,NULL),(6,'RMP-90000006',3,2,2,'Banqueta rota frente a la entrada de la escuela, con varillas expuestas.',19.432800,-99.133500,'2026-11-09 23:39:56',0,NULL,NULL),(7,'RMP-90000007',3,5,2,'La estación no tiene guía táctil en el acceso principal.',19.390000,-99.157000,'2026-10-28 23:39:56',0,NULL,NULL),(8,'RMP-90000008',3,1,1,'No existe rampa para subir a la banqueta, solo un escalón alto.',19.432600,-99.133200,'2026-10-25 23:39:56',0,NULL,NULL);
+
+-- ---------------------------------------------------------------------
+-- imagen_reporte
+-- ---------------------------------------------------------------------
+CREATE TABLE `imagen_reporte` (
+  `id_reporte` int NOT NULL,
+  `imagen` mediumblob NOT NULL,
+  `tipo_mime` enum('image/jpeg','image/png') NOT NULL,
+  `fecha_carga` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_reporte`),
+  CONSTRAINT `fk_imagen_reporte` FOREIGN KEY (`id_reporte`) REFERENCES `reporte` (`id_reporte`),
+  CONSTRAINT `ck_imagen_tamano` CHECK ((length(`imagen`) <= 5242880))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- ---------------------------------------------------------------------
+-- historial_estado_reporte
+-- ---------------------------------------------------------------------
+CREATE TABLE `historial_estado_reporte` (
+  `id_historial` int NOT NULL AUTO_INCREMENT,
+  `id_reporte` int NOT NULL,
+  `id_estado_anterior` tinyint unsigned DEFAULT NULL,
+  `id_estado_nuevo` tinyint unsigned NOT NULL,
+  `id_responsable` int NOT NULL,
+  `id_criterio` tinyint unsigned DEFAULT NULL,
+  `comentario` varchar(300) DEFAULT NULL,
+  `fecha_cambio` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_historial`),
+  KEY `ix_historial_reporte` (`id_reporte`,`fecha_cambio`),
+  KEY `ix_historial_anterior` (`id_estado_anterior`),
+  KEY `ix_historial_nuevo` (`id_estado_nuevo`),
+  KEY `ix_historial_responsable` (`id_responsable`),
+  KEY `ix_historial_criterio` (`id_criterio`),
+  CONSTRAINT `fk_historial_criterio` FOREIGN KEY (`id_criterio`) REFERENCES `criterio_invalido` (`id_criterio`),
+  CONSTRAINT `fk_historial_estado_anterior` FOREIGN KEY (`id_estado_anterior`) REFERENCES `estado_reporte` (`id_estado_reporte`),
+  CONSTRAINT `fk_historial_estado_nuevo` FOREIGN KEY (`id_estado_nuevo`) REFERENCES `estado_reporte` (`id_estado_reporte`),
+  CONSTRAINT `fk_historial_reporte` FOREIGN KEY (`id_reporte`) REFERENCES `reporte` (`id_reporte`),
+  CONSTRAINT `fk_historial_responsable` FOREIGN KEY (`id_responsable`) REFERENCES `usuario` (`id_usuario`)
+) ENGINE=InnoDB AUTO_INCREMENT=42 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `historial_estado_reporte` VALUES (1,1,NULL,1,3,NULL,NULL,'2026-11-08 23:39:56'),(2,2,NULL,1,3,NULL,NULL,'2026-11-06 23:39:56'),(3,3,NULL,1,3,NULL,NULL,'2026-11-03 23:39:56'),(4,4,NULL,1,3,NULL,NULL,'2026-11-07 23:39:56'),(5,5,NULL,1,3,NULL,NULL,'2026-11-01 23:39:56'),(6,6,NULL,1,3,NULL,NULL,'2026-11-09 23:39:56'),(7,7,NULL,1,3,NULL,NULL,'2026-10-28 23:39:56'),(8,8,NULL,1,3,NULL,NULL,'2026-10-25 23:39:56'),(16,2,1,2,4,NULL,'Se programó una visita de revisión.','2026-11-07 23:39:56'),(17,3,1,2,4,NULL,'Se programó una visita de revisión.','2026-11-04 23:39:56'),(18,7,1,2,4,NULL,'Se programó una visita de revisión.','2026-10-29 23:39:56'),(19,3,2,3,4,NULL,'La banqueta fue reparada por la alcaldía.','2026-11-06 23:39:56'),(20,5,1,4,2,2,'La imagen no muestra una barrera de accesibilidad urbana.','2026-11-02 23:39:56'),(21,6,1,2,4,NULL,NULL,'2026-11-09 23:42:10'),(22,1,NULL,1,3,NULL,NULL,'2026-11-08 23:39:56'),(23,2,NULL,1,3,NULL,NULL,'2026-11-06 23:39:56'),(24,3,NULL,1,3,NULL,NULL,'2026-11-03 23:39:56'),(25,4,NULL,1,3,NULL,NULL,'2026-11-07 23:39:56'),(26,5,NULL,1,3,NULL,NULL,'2026-11-01 23:39:56'),(27,6,NULL,1,3,NULL,NULL,'2026-11-09 23:39:56'),(28,7,NULL,1,3,NULL,NULL,'2026-10-28 23:39:56'),(29,8,NULL,1,3,NULL,NULL,'2026-10-25 23:39:56'),(37,2,1,2,4,NULL,'Se programó una visita de revisión.','2026-11-07 23:39:56'),(38,3,1,2,4,NULL,'Se programó una visita de revisión.','2026-11-04 23:39:56'),(39,7,1,2,4,NULL,'Se programó una visita de revisión.','2026-10-29 23:39:56'),(40,3,2,3,4,NULL,'La banqueta fue reparada por la alcaldía.','2026-11-06 23:39:56'),(41,5,1,4,2,2,'La imagen no muestra una barrera de accesibilidad urbana.','2026-11-02 23:39:56');
+
+-- ---------------------------------------------------------------------
+-- solicitud_eliminacion_reporte
+-- ---------------------------------------------------------------------
+CREATE TABLE `solicitud_eliminacion_reporte` (
+  `id_solicitud` int NOT NULL AUTO_INCREMENT,
+  `id_reporte` int NOT NULL,
+  `id_usuario` int NOT NULL,
+  `motivo` varchar(300) NOT NULL,
+  `estado` enum('Pendiente','Aprobada','Rechazada') NOT NULL DEFAULT 'Pendiente',
+  `motivo_rechazo` varchar(200) DEFAULT NULL,
+  `id_admin` int DEFAULT NULL,
+  `fecha_solicitud` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `fecha_resolucion` datetime DEFAULT NULL,
+  PRIMARY KEY (`id_solicitud`),
+  KEY `ix_solicitud_reporte` (`id_reporte`,`estado`),
+  KEY `ix_solicitud_usuario` (`id_usuario`),
+  KEY `ix_solicitud_admin` (`id_admin`),
+  CONSTRAINT `fk_solicitud_admin` FOREIGN KEY (`id_admin`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `fk_solicitud_reporte` FOREIGN KEY (`id_reporte`) REFERENCES `reporte` (`id_reporte`),
+  CONSTRAINT `fk_solicitud_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `ck_solicitud_motivo` CHECK ((char_length(`motivo`) between 10 and 300)),
+  CONSTRAINT `ck_solicitud_resolucion` CHECK ((((`estado` = _utf8mb4'Pendiente') and (`id_admin` is null) and (`fecha_resolucion` is null) and (`motivo_rechazo` is null)) or ((`estado` = _utf8mb4'Aprobada') and (`id_admin` is not null) and (`fecha_resolucion` is not null) and (`motivo_rechazo` is null)) or ((`estado` = _utf8mb4'Rechazada') and (`id_admin` is not null) and (`fecha_resolucion` is not null) and (`motivo_rechazo` is not null) and (char_length(`motivo_rechazo`) between 10 and 200))))
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `solicitud_eliminacion_reporte` VALUES (1,8,3,'Ya no es necesario, la rampa se reparó por su cuenta.','Pendiente',NULL,NULL,'2026-11-09 23:40:06',NULL),(2,8,3,'Ya no es necesario, la rampa se reparó por su cuenta.','Pendiente',NULL,NULL,'2026-11-10 00:34:11',NULL);
+
+-- =====================================================================
+-- 4. MODERACIÓN Y ADMINISTRACIÓN
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- denuncia_usuario
+-- ---------------------------------------------------------------------
+CREATE TABLE `denuncia_usuario` (
+  `id_denuncia` int NOT NULL AUTO_INCREMENT,
+  `id_reporte` int NOT NULL,
+  `id_denunciante` int NOT NULL,
+  `id_denunciado` int NOT NULL,
+  `motivo` enum('Mal uso de la app','Incumple Términos y Condiciones') NOT NULL,
+  `comentario` varchar(300) DEFAULT NULL,
+  `fecha_denuncia` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `estado` enum('Pendiente','Atendida','Desestimada') NOT NULL DEFAULT 'Pendiente',
+  `accion` enum('Desestimar','Alertar','Banear','Eliminar') DEFAULT NULL,
+  `comentario_resolucion` varchar(300) DEFAULT NULL,
+  `id_admin` int DEFAULT NULL,
+  `fecha_resolucion` datetime DEFAULT NULL,
+  PRIMARY KEY (`id_denuncia`),
+  UNIQUE KEY `uq_denuncia_reporte_denunciante` (`id_reporte`,`id_denunciante`),
+  KEY `ix_denuncia_denunciante` (`id_denunciante`),
+  KEY `ix_denuncia_denunciado` (`id_denunciado`),
+  KEY `ix_denuncia_bandeja` (`estado`,`fecha_denuncia`),
+  KEY `ix_denuncia_admin` (`id_admin`),
+  CONSTRAINT `fk_denuncia_admin` FOREIGN KEY (`id_admin`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `fk_denuncia_denunciado` FOREIGN KEY (`id_denunciado`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `fk_denuncia_denunciante` FOREIGN KEY (`id_denunciante`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `fk_denuncia_reporte` FOREIGN KEY (`id_reporte`) REFERENCES `reporte` (`id_reporte`),
+  CONSTRAINT `ck_denuncia_distintos` CHECK ((`id_denunciante` <> `id_denunciado`)),
+  CONSTRAINT `ck_denuncia_resolucion` CHECK ((((`estado` = _utf8mb4'Pendiente') and (`accion` is null) and (`id_admin` is null) and (`fecha_resolucion` is null)) or ((`estado` <> _utf8mb4'Pendiente') and (`accion` is not null) and (`id_admin` is not null) and (`fecha_resolucion` is not null))))
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `denuncia_usuario` VALUES (1,2,4,3,'Mal uso de la app','Utiliza mal la app','2026-11-10 23:03:01','Desestimada','Desestimar','Mentira',2,'2026-11-10 23:03:36');
+
+-- ---------------------------------------------------------------------
+-- sancion_cuenta
+-- ---------------------------------------------------------------------
+CREATE TABLE `sancion_cuenta` (
+  `id_sancion` int NOT NULL AUTO_INCREMENT,
+  `id_usuario` int NOT NULL,
+  `id_admin` int NOT NULL,
+  `tipo` enum('Suspensión','Baneo') NOT NULL,
+  `motivo` varchar(60) NOT NULL,
+  `comentario` varchar(300) DEFAULT NULL,
+  `dias` smallint unsigned DEFAULT NULL,
+  `fecha_inicio` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `fecha_fin` datetime DEFAULT NULL,
+  `activa` tinyint(1) NOT NULL DEFAULT '1',
+  PRIMARY KEY (`id_sancion`),
+  KEY `ix_sancion_usuario` (`id_usuario`),
+  KEY `ix_sancion_admin` (`id_admin`),
+  CONSTRAINT `fk_sancion_admin` FOREIGN KEY (`id_admin`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `fk_sancion_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `ck_sancion_dias` CHECK (((`dias` is null) or (`dias` between 1 and 365))),
+  CONSTRAINT `ck_sancion_tipo` CHECK ((((`tipo` = _utf8mb4'Suspensión') and (`dias` is not null) and (`fecha_fin` is not null)) or ((`tipo` = _utf8mb4'Baneo') and (`dias` is null) and (`fecha_fin` is null))))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- ---------------------------------------------------------------------
+-- decision_registro
+-- ---------------------------------------------------------------------
+CREATE TABLE `decision_registro` (
+  `id_decision` int NOT NULL AUTO_INCREMENT,
+  `id_usuario` int NOT NULL,
+  `id_admin` int NOT NULL,
+  `decision` enum('Aprobar','Rechazar') NOT NULL,
+  `motivo` varchar(200) DEFAULT NULL,
+  `fecha_decision` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_decision`),
+  KEY `ix_decision_usuario` (`id_usuario`),
+  KEY `ix_decision_admin` (`id_admin`),
+  CONSTRAINT `fk_decision_admin` FOREIGN KEY (`id_admin`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `fk_decision_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `ck_decision_motivo` CHECK (((`decision` = _utf8mb4'Aprobar') or ((`motivo` is not null) and (char_length(`motivo`) between 10 and 200))))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- ---------------------------------------------------------------------
+-- alerta_usuario
+-- ---------------------------------------------------------------------
+CREATE TABLE `alerta_usuario` (
+  `id_alerta` int NOT NULL AUTO_INCREMENT,
+  `id_usuario` int NOT NULL,
+  `id_admin` int NOT NULL,
+  `mensaje` varchar(300) NOT NULL,
+  `fecha_envio` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_alerta`),
+  KEY `ix_alerta_usuario` (`id_usuario`),
+  KEY `ix_alerta_admin` (`id_admin`),
+  CONSTRAINT `fk_alerta_admin` FOREIGN KEY (`id_admin`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `fk_alerta_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuario` (`id_usuario`),
+  CONSTRAINT `ck_alerta_mensaje` CHECK ((char_length(`mensaje`) between 10 and 300))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- ---------------------------------------------------------------------
+-- bitacora
+-- ---------------------------------------------------------------------
+CREATE TABLE `bitacora` (
+  `id_bitacora` bigint NOT NULL AUTO_INCREMENT,
+  `id_usuario` int NOT NULL,
+  `id_rol` tinyint unsigned NOT NULL,
+  `accion` varchar(60) NOT NULL,
+  `entidad` varchar(40) DEFAULT NULL,
+  `id_entidad` int DEFAULT NULL,
+  `detalle` varchar(255) DEFAULT NULL,
+  `fecha_hora` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_bitacora`),
+  KEY `ix_bitacora_usuario` (`id_usuario`),
+  KEY `ix_bitacora_rol` (`id_rol`),
+  KEY `ix_bitacora_fecha` (`fecha_hora`),
+  CONSTRAINT `fk_bitacora_rol` FOREIGN KEY (`id_rol`) REFERENCES `rol` (`id_rol`),
+  CONSTRAINT `fk_bitacora_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuario` (`id_usuario`)
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `bitacora` VALUES (1,4,2,'ACTUALIZAR_ESTADO_REPORTE','reporte',6,'Estado 1 → 2','2026-11-09 23:42:10'),(2,2,3,'INVITAR_ADMIN','invitacion',1,'carlosskqglz@gmail.com','2026-11-10 10:08:38'),(3,2,3,'ELIMINAR_CATALOGO','tipo_problema',5,'Sin guía táctil','2026-11-10 10:18:10'),(4,2,3,'AGREGAR_CATALOGO','tipo_problema',11,'Lugar inadecuado','2026-11-10 10:18:44'),(5,4,2,'DENUNCIAR_USUARIO','denuncia',1,'Mal uso de la app','2026-11-10 23:03:01'),(6,2,3,'RESOLVER_DENUNCIA','usuario',3,'Denuncia 1: Desestimar','2026-11-10 23:03:36'),(7,2,3,'INVITAR_ADMIN','invitacion',2,'rampifypruebas@gmail.com','2026-11-11 00:22:13');
+
+-- =====================================================================
+-- Restaurar configuración
+-- =====================================================================
+SET FOREIGN_KEY_CHECKS = 1;
+SET UNIQUE_CHECKS = 1;
+SET SQL_MODE = DEFAULT;
